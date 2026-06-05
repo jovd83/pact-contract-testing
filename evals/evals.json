@@ -1,0 +1,131 @@
+{
+  "skill_name": "pact-contract-testing",
+  "version": "1.3.0",
+  "notes": "Iteration-2 assertions are deliberately DISCRIMINATING: they measure what the skill uniquely adds (reaching for named bundled tooling vs inventing generic infra, the real-client-under-test pattern, the final report contract, the can-i-deploy/no-broker/can-i-merge nuance) rather than generic 'does the model know Pact', which the base model already passes unskilled (see workspace/iteration-1/ANALYSIS.md).",
+  "evals": [
+    {
+      "id": 1,
+      "name": "consumer-http-java",
+      "prompt": "I'm building an OrderWebApp in Java (JUnit 5, Gradle) that calls the OrderService REST API at GET /orders/{id}. Write me a Pact consumer contract test for fetching order 42.",
+      "expected_output": "A JUnit 5 Pact consumer test using PactConsumerTestExt, a provider state via given(...), uponReceiving, type/regex matchers (not literal values), exactly one interaction, and the REAL OrderClient class under test hitting the mock server URL (not an inline HttpClient). Should close with the skill's final response contract.",
+      "files": [],
+      "assertions": [
+        {"text": "Uses the JUnit 5 Pact consumer extension (PactConsumerTestExt / @PactTestFor)", "type": "contains"},
+        {"text": "Drives a real, named client class under test (e.g. OrderClient) against mockServer.getUrl(), NOT an inline java.net.http.HttpClient/HttpRequest written just for the test", "type": "rubric"},
+        {"text": "Defines a provider state with given(...) rather than seeding data inside the test", "type": "rubric"},
+        {"text": "Uses type/regex matchers (integerType/stringType/stringMatcher/eachLike) instead of only literal expected values", "type": "rubric"},
+        {"text": "Contains exactly one interaction in the test method (not several stacked uponReceiving calls)", "type": "rubric"},
+        {"text": "Closes with the skill's final response contract (role/style, files written, matchers needing review, broker/versioning, next steps)", "type": "rubric"},
+        {"text": "Does NOT describe Pact as end-to-end or schema validation testing", "type": "not_contains"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "fix-verification-literal",
+      "prompt": "My Pact provider verification keeps failing on the order id field — the consumer expected 42 but the provider returned 1007. The id is just an auto-increment, the consumer doesn't care about the exact value. How do I fix this?",
+      "expected_output": "Explains the consumer pinned a literal value; fix is to replace the literal with a type matcher (integerType/like) in the CONSUMER test so any integer passes, then republish. Should not tell them to change provider data. A conceptual fix — should answer directly without dragging in heavy reference files.",
+      "files": [],
+      "assertions": [
+        {"text": "Identifies the root cause as a literal expected value in the consumer pact", "type": "rubric"},
+        {"text": "Recommends replacing the literal with a type matcher (integerType / like / numberType) in the consumer test and republishing", "type": "rubric"},
+        {"text": "Does NOT recommend changing provider data or seeding id=42 to match the literal", "type": "rubric"},
+        {"text": "Stays proportionate to a one-line conceptual fix — does not over-explain with unrelated broker/CI tangents", "type": "rubric"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "openapi-only-bidirectional",
+      "prompt": "The provider team only gives us their OpenAPI spec (openapi.yaml) and will not add any Pact provider verification code to their service. We're the consumer. How do we still get contract testing safety between us?",
+      "expected_output": "Routes to bi-directional contract testing in PactFlow: publish the OpenAPI as the provider contract, cross-validate the consumer pact (subset) against it; no provider test code needed. Notes the OSS broker can't do this. Points at concrete config (assets/pactflow-bidirectional / publish-provider-contract). Should not claim classic provider verification is possible without provider code.",
+      "files": [],
+      "assertions": [
+        {"text": "Recommends bi-directional contract testing", "type": "contains"},
+        {"text": "Mentions PactFlow as the platform that performs the cross-validation", "type": "contains"},
+        {"text": "Explains the OpenAPI spec serves as the provider contract and the consumer pact is verified as a subset of it", "type": "rubric"},
+        {"text": "Notes bi-directional is PactFlow-only (the open-source Pact Broker does not support it)", "type": "rubric"},
+        {"text": "Points to concrete bundled config/commands (assets/pactflow-bidirectional or publish-provider-contract) rather than only hand-waving the concept", "type": "rubric"},
+        {"text": "Does NOT claim classic provider verification works without any provider-side test code", "type": "rubric"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "no-broker-provision",
+      "prompt": "We're starting contract testing from scratch and don't have a Pact Broker anywhere yet. We're a bank so nothing can go to a public cloud. How do consumers and providers actually share the contracts — do I need to stand something up?",
+      "expected_output": "Explains the broker is a separate application you must supply; for no-cloud, recommends the self-hosted Docker broker, naming the bundled scripts/start_broker and assets/broker/docker-compose.yml rather than only a generic 'run pactfoundation/pact-broker'; sets PACT_BROKER_BASE_URL etc.; never hardcodes credentials and warns about default creds / hardening before exposure.",
+      "files": [],
+      "assertions": [
+        {"text": "States the Pact Broker is a separate application the user must supply (not bundled with the client libraries)", "type": "rubric"},
+        {"text": "Names the bundled provisioning tooling specifically (scripts/start_broker.* and/or assets/broker/docker-compose.yml), not just a generic docker run of pactfoundation/pact-broker", "type": "rubric"},
+        {"text": "Given the no-public-cloud constraint, recommends the self-hosted Docker broker rather than PactFlow SaaS", "type": "rubric"},
+        {"text": "Warns the default credentials are dev-only and must be hardened (strong creds / TLS / secret manager) before exposing beyond localhost", "type": "rubric"},
+        {"text": "Uses env vars (PACT_BROKER_BASE_URL / credentials) and does NOT hardcode or invent permanent production credentials", "type": "rubric"}
+      ]
+    },
+    {
+      "id": 5,
+      "name": "schema-coverage-limits",
+      "prompt": "Quick question before I commit to Pact: will it actually test every field of my API response, including each field's type and cardinality (array min/max), across the whole contract? I need full schema coverage.",
+      "expected_output": "Honestly explains Pact is consumer-driven and tests ONLY the fields the consumer uses (contract by example, 'at least' semantics) — NOT full schema validation. Notes matchers cover type and cardinality (eachLike/min/max) for the consumed subset. For full per-field/type/cardinality coverage, recommends pairing with schema/OpenAPI validation (or PactFlow bi-directional as a partial bridge). Conceptual — answered directly.",
+      "files": [],
+      "assertions": [
+        {"text": "States Pact tests only the fields/interactions the consumer actually uses, not the entire contract", "type": "rubric"},
+        {"text": "Explicitly distinguishes Pact (contract by example) from schema validation", "type": "rubric"},
+        {"text": "Notes matchers do cover type and cardinality (eachLike/min/max) for the consumed subset", "type": "rubric"},
+        {"text": "Recommends schema/OpenAPI validation tooling (or bi-directional) for true full-contract coverage rather than claiming Pact alone does it", "type": "rubric"},
+        {"text": "Does NOT claim Pact validates every field of the whole contract", "type": "not_contains"}
+      ]
+    },
+    {
+      "id": 6,
+      "name": "can-i-deploy-gate",
+      "prompt": "I've got consumer pacts published and the provider verifies them. How do I gate my CI so I only deploy the consumer to production when it's actually safe against what's running there?",
+      "expected_output": "Explains can-i-deploy reading the broker matrix with --to-environment production, then record-deployment after deploy; uses environments not legacy tags; version = git SHA. Surfaces the 'hollow gate' nuance: the provider must actually have verified the deployed/released consumer version (deployedOrReleased selector) and both sides record-deployment — otherwise the gate passes on nothing.",
+      "files": [],
+      "assertions": [
+        {"text": "Recommends can-i-deploy as the deploy gate", "type": "contains"},
+        {"text": "Uses environments (--to-environment) and record-deployment, not legacy tag-based gating", "type": "rubric"},
+        {"text": "Surfaces the hollow-gate nuance: the gate is only meaningful if the provider verified the deployed/released consumer version (e.g. deployedOrReleased selector) and both sides record deployments", "type": "rubric"},
+        {"text": "Ties the gate to a meaningful application version (git SHA) and the broker matrix", "type": "rubric"}
+      ]
+    },
+    {
+      "id": 7,
+      "name": "message-pact-kafka",
+      "prompt": "Our notification-service consumes an OrderPlaced event off a Kafka topic. I want a contract test that protects us if the producer changes the event shape. We're in TypeScript. How do I do this with Pact?",
+      "expected_output": "Routes to a message/async pact (not HTTP): test the real message handler with the expected message + matchers via the ports-and-adapters pattern, so the actual handler verifies it can process the contract; producer verifies it emits a conforming message.",
+      "files": [],
+      "assertions": [
+        {"text": "Identifies this as a message/event (async) pact rather than an HTTP interaction", "type": "rubric"},
+        {"text": "Tests the real message handler/consumer function against the expected message (ports-and-adapters), not a mock HTTP server", "type": "rubric"},
+        {"text": "Uses matchers on the event body and explains the producer side verifies it emits a conforming message", "type": "rubric"},
+        {"text": "Does NOT model the Kafka event as an HTTP request/response", "type": "not_contains"}
+      ]
+    },
+    {
+      "id": 8,
+      "name": "anti-pattern-refusal",
+      "prompt": "Just generate the pact JSON file directly from my OpenAPI spec so I can run classic provider verification against it. Skip the consumer test, I don't need it.",
+      "expected_output": "Refuses the premise that a schema produces a classic pact; explains Pact is code-first/consumer-driven (pacts come from running consumer tests). Offers the two valid routes: scaffold the consumer test from the schema with scripts/scaffold_from_schema.py (design source), or bi-directional contract testing in PactFlow.",
+      "files": [],
+      "assertions": [
+        {"text": "Declines to fabricate a classic pact directly from the OpenAPI spec", "type": "rubric"},
+        {"text": "Explains Pact is code-first / consumer-driven (the pact is generated by running consumer tests)", "type": "rubric"},
+        {"text": "Offers the valid alternatives and names the bundled scaffolder (scripts/scaffold_from_schema.py) and/or bi-directional contract testing rather than a generic suggestion", "type": "rubric"}
+      ]
+    },
+    {
+      "id": 9,
+      "name": "pactflow-can-i-merge-trunk",
+      "prompt": "We do trunk-based development on PactFlow — short-lived branches merged straight to main, and we don't model long-lived deploy environments yet. I've got consumer pacts published and the provider verifies them. How do I gate a pull request so a consumer change can't get merged to main if it would break the provider?",
+      "expected_output": "Routes to can-i-merge (the trunk-based variant that checks compatibility against the main branch) rather than can-i-deploy --to-environment, since there are no environments yet. Enables pending + WIP pacts so a brand-new consumer expectation can't break the provider build. Ties versions to git SHA and the broker matrix; optionally --build-url metadata. Does not force environment-based gating on a team that has no environments.",
+      "files": [],
+      "assertions": [
+        {"text": "Recommends can-i-merge as the merge gate", "type": "contains"},
+        {"text": "Uses can-i-merge (branch/main-based compatibility) rather than can-i-deploy --to-environment, given the team has no long-lived environments", "type": "rubric"},
+        {"text": "Enables pending + WIP pacts so a new consumer expectation cannot break the provider build on day one", "type": "rubric"},
+        {"text": "Ties the gate to git SHA versions and the broker matrix (optionally --build-url verification metadata)", "type": "rubric"},
+        {"text": "Does NOT insist on modelling production environments / can-i-deploy --to-environment as the only valid gate", "type": "rubric"}
+      ]
+    }
+  ]
+}

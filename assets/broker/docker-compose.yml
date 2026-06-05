@@ -1,0 +1,53 @@
+# Standalone, self-hosted Pact Broker — use this when you do NOT already have
+# a broker (PactFlow or an existing self-hosted instance).
+#
+#   docker compose -f assets/broker/docker-compose.yml up -d
+#   # Broker UI/API: http://localhost:9292   (basic auth below)
+#
+# Then point the skill at it:
+#   export PACT_BROKER_BASE_URL=http://localhost:9292
+#   export PACT_BROKER_USERNAME=${PACT_BROKER_USERNAME:-pact}
+#   export PACT_BROKER_PASSWORD=${PACT_BROKER_PASSWORD:-pact}
+#
+# Credentials and port are overridable via the env vars referenced below.
+# Data persists in the named volume `pact_broker_pgdata` (unlike the throwaway
+# sandbox broker) so contracts/verifications survive `down`/`up`.
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${PACT_BROKER_DB_USER:-pactbroker}
+      POSTGRES_PASSWORD: ${PACT_BROKER_DB_PASSWORD:-pactbroker}
+      POSTGRES_DB: ${PACT_BROKER_DB_NAME:-pactbroker}
+    volumes:
+      - pact_broker_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${PACT_BROKER_DB_USER:-pactbroker}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  broker:
+    image: pactfoundation/pact-broker:latest
+    ports:
+      - "${PACT_BROKER_PORT:-9292}:9292"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PACT_BROKER_DATABASE_URL: "postgres://${PACT_BROKER_DB_USER:-pactbroker}:${PACT_BROKER_DB_PASSWORD:-pactbroker}@postgres/${PACT_BROKER_DB_NAME:-pactbroker}"
+      PACT_BROKER_BASIC_AUTH_USERNAME: ${PACT_BROKER_USERNAME:-pact}
+      PACT_BROKER_BASIC_AUTH_PASSWORD: ${PACT_BROKER_PASSWORD:-pact}
+      # Read-only credentials so dashboards/CI reads don't need write access.
+      PACT_BROKER_BASIC_AUTH_READ_ONLY_USERNAME: ${PACT_BROKER_READONLY_USERNAME:-readonly}
+      PACT_BROKER_BASIC_AUTH_READ_ONLY_PASSWORD: ${PACT_BROKER_READONLY_PASSWORD:-readonly}
+      PACT_BROKER_ALLOW_DASHBOARD_FROM_NON_LOCALHOST: "true"
+      PACT_BROKER_LOG_LEVEL: warn
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9292/diagnostic/status/heartbeat"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pact_broker_pgdata:

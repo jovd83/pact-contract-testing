@@ -1,0 +1,30 @@
+# Pact output
+pacts/
+build/pacts/
+target/pacts/
+pact/logs/
+*.log
+
+# Language build artifacts
+target/
+build/
+bin/
+obj/
+node_modules/
+dist/
+.gradle/
+__pycache__/
+*.pyc
+.venv/
+vendor/
+
+# Tooling / IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Secrets — never commit broker credentials
+.env
+.env.*
+!.env.example

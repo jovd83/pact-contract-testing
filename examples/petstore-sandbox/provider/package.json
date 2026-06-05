@@ -1,0 +1,15 @@
+{
+  "name": "petstore-provider",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Our own Petstore provider (we control it) for Pact provider verification + the iteration-4 breaking change.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "verify": "node verify.js"
+  },
+  "dependencies": {
+    "@pact-foundation/pact": "^16.5.0",
+    "express": "^4.22.2"
+  }
+}

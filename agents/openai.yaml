@@ -1,0 +1,4 @@
+display_name: "Pact Contract Testing"
+short_description: "Design and implement consumer-driven contract tests with Pact in any supported language, derived from a contract source, code, requirements, or cookbook recipes."
+default_prompt: "Use $pact-contract-testing to design and implement Pact consumer-driven contract tests. Confirm role (consumer/provider), interaction style (HTTP/message/gRPC/GraphQL), language, contract source, and broker, then scaffold or write the tests and wire the Pact Broker lifecycle."
+allow_implicit_invocation: true

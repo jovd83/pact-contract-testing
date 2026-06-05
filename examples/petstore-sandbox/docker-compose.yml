@@ -1,0 +1,28 @@
+# Pact Broker for the Petstore sandbox.
+# Broker UI/API: http://localhost:9292  (basic auth: pact / pact)
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: pact
+      POSTGRES_PASSWORD: pact
+      POSTGRES_DB: pact
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "pact"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  broker:
+    image: pactfoundation/pact-broker:latest
+    ports:
+      - "9292:9292"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PACT_BROKER_DATABASE_URL: "postgres://pact:pact@postgres/pact"
+      PACT_BROKER_BASIC_AUTH_USERNAME: pact
+      PACT_BROKER_BASIC_AUTH_PASSWORD: pact
+      PACT_BROKER_ALLOW_DASHBOARD_FROM_NON_LOCALHOST: "true"
+      PACT_BROKER_LOG_LEVEL: warn

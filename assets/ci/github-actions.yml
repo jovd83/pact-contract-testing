@@ -1,0 +1,60 @@
+# Pact CI template — consumer publish + provider verify + can-i-deploy.
+# Copy into .github/workflows/ and adapt the build steps to your language pack.
+# Secrets required: PACT_BROKER_BASE_URL, PACT_BROKER_TOKEN.
+name: pact
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  PACT_BROKER_BASE_URL: ${{ secrets.PACT_BROKER_BASE_URL }}
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+  GIT_SHA: ${{ github.sha }}
+  GIT_BRANCH: ${{ github.ref_name }}
+
+jobs:
+  # ---------------- CONSUMER ----------------
+  consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # --- adapt to your stack (example: Node) ---
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - run: npm test          # generates pacts into ./pacts
+      # --- publish with version = commit SHA, branch = ref ---
+      - name: Publish pacts
+        run: ./scripts/publish_pacts.sh ./pacts
+      # --- deploy gate (consumer) ---
+      - name: can-i-deploy
+        run: ./scripts/can_i_deploy.sh --pacticipant OrderWebApp --to-environment production
+      - name: Record deployment
+        if: github.ref == 'refs/heads/main'
+        run: |
+          pact-broker record-deployment --pacticipant OrderWebApp \
+            --version "$GIT_SHA" --environment production \
+            --broker-base-url "$PACT_BROKER_BASE_URL" --broker-token "$PACT_BROKER_TOKEN"
+
+  # ---------------- PROVIDER ----------------
+  # Trigger this via a broker webhook (contract_requiring_verification_published)
+  # as well as on provider pushes.
+  provider:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - name: Start provider
+        run: ./gradlew bootRun &   # or your provider start command; wait for health
+      - name: Verify pacts (pending + WIP enabled)
+        run: |
+          ./gradlew pactVerify \
+            -Dpact.provider.version="$GIT_SHA" \
+            -Dpact.provider.branch="$GIT_BRANCH" \
+            -Dpact.verifier.publishResults=true \
+            -Dpactbroker.enablePending=true \
+            -Dpactbroker.consumerversionselectors.rawselectors='[{"mainBranch":true},{"deployedOrReleased":true}]'
+      - name: can-i-deploy
+        run: ./scripts/can_i_deploy.sh --pacticipant OrderService --to-environment production
